@@ -380,6 +380,28 @@ pheatmap(
 
 library(tidyverse)
 library(ggplot2)
+
+# Top 10 VIP metabolites
+top10_metabolites <- head(vip_df$Metabolite, 10)
+
+# Create dataframe
+plot_df <- pca_df[, c(
+  "Host",
+  top10_metabolites
+)]
+
+# Convert to long format
+plot_long <- tidyr::pivot_longer(
+  plot_df,
+  cols = top10_metabolites,
+  names_to = "Metabolite",
+  values_to = "Concentration"
+)
+
+
+
+
+
 ggplot(
   plot_long,
   aes(
