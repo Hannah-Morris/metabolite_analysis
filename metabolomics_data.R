@@ -1,6 +1,7 @@
 #clear working directory:
 rm(list=ls())
 
+
 library(tidyverse)
 
 # Set working directory
@@ -15,11 +16,11 @@ df[df == ""] <- NA
 
 # Keep metabolite metadata separately
 met_info <- df %>%
-  select(Metabolite, Formula, `HMDB Accession Number`)
+  dplyr::select(Metabolite, Formula, `HMDB Accession Number`)
 
 # Keep only sample columns
 df_data <- df %>%
-  select(-Metabolite, -Formula, -`HMDB Accession Number`)
+  dplyr::select(-Metabolite, -Formula, -`HMDB Accession Number`)
 
 # Set metabolite names as row names
 rownames(df_data) <- df$Metabolite
@@ -139,7 +140,7 @@ pca_df <- df_t %>%
 
 # Extract only numeric metabolite data
 pca_numeric <- pca_df %>%
-  select(where(is.numeric))
+  dplyr::select(where(is.numeric))
 
 # REMOVE columns with zero variance 
 pca_numeric <- pca_numeric[, apply(pca_numeric, 2, var) != 0]
@@ -205,9 +206,207 @@ plsda_model <- plsda(
   ncomp = 2
 )
 
+#Score plot:
+plotIndiv(
+  plsda_model,
+  comp = c(1,2),
+  group = Y,
+  ellipse = TRUE,
+  legend = TRUE,
+  ind.names = FALSE,
+  title = "PLS-DA: Shrimp Species"
+)
+
+#Cross-validation
+set.seed(123)
+
+perf_plsda <- perf(
+  plsda_model,
+  validation = "Mfold",
+  folds = 5,
+  nrepeat = 100,
+  progressBar = TRUE
+)
+
+#Classification error:
+perf_plsda$error.rate
+
+#plot:
+plot(perf_plsda)
 
 
 
+
+#### gregarine PLS-DA
+Y_inf <- factor(pca_df$Gregarine_status)
+
+plsda_inf <- plsda(
+  X,
+  Y_inf,
+  ncomp = 2
+)
+
+
+plotIndiv(
+  plsda_inf,
+  comp = c(1,2),
+  group = Y_inf,
+  ellipse = TRUE,
+  legend = TRUE,
+  ind.names = FALSE,
+  title = "PLS-DA: Gregarine Status"
+)
+
+
+
+
+
+#### VIP scores
+vip_scores <- vip(plsda_model)
+head(vip_scores)
+
+dim(vip_scores)
+
+str(vip_scores)
+
+
+vip_df <- data.frame(
+  Metabolite = rownames(vip_scores),
+  VIP = vip_scores[,1]
+)
+
+head(vip_df)
+
+
+vip_df <- vip_df[order(-vip_df$VIP), ]
+
+head(vip_df, 20)
+
+
+
+
+vip_df %>%
+  slice_max(VIP, n = 20) %>%
+  ggplot(aes(
+    x = reorder(Metabolite, VIP),
+    y = VIP
+  )) +
+  geom_col() +
+  coord_flip() +
+  theme_classic() +
+  labs(
+    title = "Top 20 VIP Metabolites",
+    x = "",
+    y = "VIP Score"
+  )
+
+############################Heatmap of VIP metabolites ########################
+
+library(dplyr)
+library(pheatmap)
+
+
+
+#Select top (10)
+top_vips <- vip_df %>%
+  arrange(desc(VIP)) %>%
+  slice_head(n = 10)
+
+top_metabolites <- top_vips$Metabolite
+
+
+#Create etabolite matrix
+#Extract only top 25
+heat_data <- pca_df %>%
+  dplyr::select(all_of(top_metabolites))
+
+#Convert to matrix
+heat_matrix <- as.matrix(heat_data)
+
+#Sample ID as row name
+rownames(heat_matrix) <- pca_df$SampleID
+
+
+
+#Z-score scaling (red=higher, blue=lower)
+heat_matrix_scaled <- scale(heat_matrix)
+
+#species
+annotation_col <- data.frame(
+  Species = pca_df$Host
+)
+
+rownames(annotation_col) <- pca_df$SampleID
+
+#Species +gregarine status:
+annotation_col <- data.frame(
+  Species = pca_df$Host,
+  Gregarine = pca_df$Gregarine_status
+)
+
+rownames(annotation_col) <- pca_df$SampleID
+
+
+#Group by species
+sample_order <- order(pca_df$Host)
+
+heat_matrix_scaled <- heat_matrix_scaled[sample_order, ]
+
+annotation_col <- annotation_col[sample_order, ]
+
+#plot
+pheatmap(
+  t(heat_matrix_scaled),
+  
+  annotation_col = annotation_col,
+  
+  cluster_cols = FALSE,
+  cluster_rows = FALSE,
+  
+  show_colnames = FALSE,
+  
+  main = "Top 10 VIP Metabolites"
+)
+
+
+
+
+
+
+
+
+###################
+### Box plot for top 10 metabolites
+
+library(tidyverse)
+library(ggplot2)
+ggplot(
+  plot_long,
+  aes(
+    x = Host,
+    y = Concentration,
+    fill = Host
+  )
+) +
+  geom_boxplot(
+    width = 0.6,
+    outlier.shape = NA
+  ) +
+  geom_jitter(
+    width = 0.15,
+    size = 1.2,
+    alpha = 0.7
+  ) +
+  facet_wrap(
+    ~ Metabolite,
+    scales = "free_y",
+    ncol = 2
+  ) +
+  theme_classic() +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
 
 
 
@@ -265,7 +464,7 @@ top20_greg_pos <- data %>%
   slice_head(n = 20)
 
 p1 <- ggplot(top20_greg_pos,
-       aes(x = reorder(Metabolite, mean_abundance), y = mean_abundance)) +
+             aes(x = reorder(Metabolite, mean_abundance), y = mean_abundance)) +
   geom_col(fill = "#E64B35FF") +
   coord_flip() +
   theme_minimal(base_size = 14) +
@@ -284,7 +483,7 @@ top20_greg_neg <- data %>%
   slice_head(n = 20)
 
 p2 <- ggplot(top20_greg_neg,
-       aes(x = reorder(Metabolite, mean_abundance), y = mean_abundance)) +
+             aes(x = reorder(Metabolite, mean_abundance), y = mean_abundance)) +
   geom_col(fill = "#4DBBD5FF") +
   coord_flip() +
   theme_minimal(base_size = 14) +
@@ -394,7 +593,7 @@ top20_blast_pos <- data %>%
   slice_head(n = 20)
 
 p3 <- ggplot(top20_blast_pos,
-       aes(x = reorder(Metabolite, mean_abundance), y = mean_abundance)) +
+             aes(x = reorder(Metabolite, mean_abundance), y = mean_abundance)) +
   geom_col(fill = "#00A087FF") +
   coord_flip() +
   theme_minimal(base_size = 14) +
@@ -413,7 +612,7 @@ top20_blast_neg <- data %>%
   slice_head(n = 20)
 
 p4 <- ggplot(top20_blast_neg,
-       aes(x = reorder(Metabolite, mean_abundance), y = mean_abundance)) +
+             aes(x = reorder(Metabolite, mean_abundance), y = mean_abundance)) +
   geom_col(fill = "#3C5488FF") +
   coord_flip() +
   theme_minimal(base_size = 14) +
@@ -422,7 +621,5 @@ p4 <- ggplot(top20_blast_neg,
     x = "Metabolite",
     y = "Mean abundance"
   )
- p3 + p4
-  
+p3 + p4
 
- 
