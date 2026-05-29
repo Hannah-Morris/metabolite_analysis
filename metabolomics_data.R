@@ -205,113 +205,14 @@ plsda_model <- plsda(
   ncomp = 2
 )
 
-#Score plot:
-plotIndiv(
-  plsda_model,
-  comp = c(1,2),
-  group = Y,
-  ellipse = TRUE,
-  legend = TRUE,
-  ind.names = FALSE,
-  title = "PLS-DA: Shrimp Species"
-)
-
-#Cross-validation
-set.seed(123)
-
-perf_plsda <- perf(
-  plsda_model,
-  validation = "Mfold",
-  folds = 5,
-  nrepeat = 100,
-  progressBar = TRUE
-)
-
-#Classification error:
-perf_plsda$error.rate
-
-#plot:
-plot(perf_plsda)
-
-
-
-
-#### gregarine PLS-DA
-Y_inf <- factor(pca_df$Gregarine_status)
-
-plsda_inf <- plsda(
-  X,
-  Y_inf,
-  ncomp = 2
-)
-
-
-plotIndiv(
-  plsda_inf,
-  comp = c(1,2),
-  group = Y_inf,
-  ellipse = TRUE,
-  legend = TRUE,
-  ind.names = FALSE,
-  title = "PLS-DA: Gregarine Status"
-)
-
-
-
-
-
-#### VIP scores
-vip_scores <- vip(plsda_model)
-head(vip_scores)
-
-dim(vip_scores)
-
-str(vip_scores)
-
-
-vip_df <- data.frame(
-  Metabolite = rownames(vip_scores),
-  VIP = vip_scores[,1]
-)
-
-head(vip_df)
-
-
-vip_df <- vip_df[order(-vip_df$VIP), ]
-
-head(vip_df, 20)
-
-
-
-
-vip_df %>%
-  slice_max(VIP, n = 20) %>%
-  ggplot(aes(
-    x = reorder(Metabolite, VIP),
-    y = VIP
-  )) +
-  geom_col() +
-  coord_flip() +
-  theme_classic() +
-  labs(
-    title = "Top 20 VIP Metabolites",
-    x = "",
-    y = "VIP Score"
-  )
 
 
 
 
 
 
-###################
-### Violin plot for Taurine 
-ggplot(pca_df,
-       aes(x = Host,
-           y = Taurine,
-           fill = Host)) +
-  geom_violin(trim = FALSE) +
-  geom_jitter(width = 0.1)
+
+
 
 
 
