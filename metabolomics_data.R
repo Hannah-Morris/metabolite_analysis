@@ -169,7 +169,15 @@ ggplot(pca_scores,
     x = paste0("PC1 (", round(var_explained[1] * 100, 1), "%)"),
     y = paste0("PC2 (", round(var_explained[2] * 100, 1), "%)")
   ) +
-  scale_colour_brewer(palette = "Set1") +
+   scale_colour_brewer(
+  palette = "Set1",
+  name = "Host",
+  labels = c(
+    expression(italic("L. vannamei")),
+    expression(italic("M. rosenbergii")),
+    expression(italic("P. monodon"))
+  )
+)+
   theme_classic() +
   theme(
     text = element_text(size = 12),
@@ -217,6 +225,47 @@ plotIndiv(
   title = "PLS-DA: Shrimp Species"
 )
 
+plsda_scores <- as.data.frame(plsda_model$variates$X)
+
+plsda_scores$Host <- pca_df$Host
+plsda_scores$Gregarine_status <- pca_df$Gregarine_status
+
+
+
+ggplot(
+  plsda_scores,
+  aes(
+    x = comp1,
+    y = comp2,
+    colour = Host
+  )
+) +
+  geom_point(size = 2) +
+  stat_ellipse(
+    aes(group = Host),
+    linetype = 2,
+    linewidth = 0.8
+  ) +
+  labs(
+    title = "PLS-DA: Shrimp Species",
+    x = "Component 1",
+    y = "Component 2"
+  ) +
+  scale_colour_brewer(
+    palette = "Set1",
+    name = "Host",
+    labels = c(
+      expression(italic("L. vannamei")),
+      expression(italic("M. rosenbergii")),
+      expression(italic("P. monodon"))
+    )
+  ) +
+  theme_classic() +
+  theme(
+    text = element_text(size = 12),
+    legend.title = element_text(face = "bold")
+  )
+
 #Cross-validation
 set.seed(123)
 
@@ -258,7 +307,41 @@ plotIndiv(
 )
 
 
+plsda_inf_scores <- as.data.frame(plsda_inf$variates$X)
 
+plsda_inf_scores$Gregarine_status <- pca_df$Gregarine_status
+
+ggplot(
+  plsda_inf_scores,
+  aes(
+    x = comp1,
+    y = comp2,
+    colour = Gregarine_status
+  )
+) +
+  geom_point(size = 2) +
+  stat_ellipse(
+    aes(group = Gregarine_status),
+    linetype = 2,
+    linewidth = 0.8
+  ) +
+  labs(
+    title = "PLS-DA: Gregarine Status",
+    x = "Component 1",
+    y = "Component 2"
+  ) +
+  scale_colour_manual(
+    values = c(
+      "Negative" = "hotpink",
+      "Positive" = "aquamarine"
+    ),
+    name = "Gregarine status"
+  ) +
+  theme_classic() +
+  theme(
+    text = element_text(size = 12),
+    legend.title = element_text(face = "bold")
+  )
 
 
 #### VIP scores
