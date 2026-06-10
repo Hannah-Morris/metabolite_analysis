@@ -1,7 +1,6 @@
 #clear working directory:
 rm(list=ls())
 
-
 library(tidyverse)
 
 # Set working directory
@@ -86,7 +85,6 @@ ggplot(top_abund, aes(x = reorder(Metabolite, MeanAbundance), y = MeanAbundance)
     y = "Mean Concentration"
   ) +
   theme_minimal()
-
 
 
 
@@ -727,4 +725,133 @@ p4 <- ggplot(top20_blast_neg,
     y = "Mean abundance"
   )
 p3 + p4
+
+
+
+# -----------------------------
+# L. vannamei only
+# -----------------------------
+
+# Get vannamei sample IDs from metadata
+van_samples <- meta %>%
+  filter(Species == "L.vannamei" | Species == "L. vannamei") %>%
+  pull(Sample_ID)
+
+# Keep only sample columns that exist in metabolite data
+van_samples <- intersect(van_samples, colnames(df_data))
+
+# Subset metabolite matrix
+van_df <- df_data[, van_samples, drop = FALSE]
+
+# Calculate mean abundance for each metabolite
+van_abundance <- rowMeans(van_df, na.rm = TRUE)
+
+# Create results table
+van_abund_df <- data.frame(
+  Metabolite = rownames(van_df),
+  MeanAbundance = van_abundance,
+  row.names = NULL
+) %>%
+  filter(Metabolite != "Methanol") %>%
+  left_join(met_info, by = "Metabolite") %>%
+  arrange(desc(MeanAbundance))
+
+# View top 20
+head(van_abund_df, 20)
+
+# Extract top 20 metabolites
+top20_van <- van_abund_df %>%
+  slice_head(n = 20)
+
+# Plot
+ggplot(top20_van,
+       aes(x = reorder(Metabolite, MeanAbundance),
+           y = MeanAbundance)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Top 20 Most Abundant Metabolites in L. vannamei",
+    x = "Metabolite",
+    y = "Mean Concentration"
+  ) +
+  theme_minimal()
+
+
+
+library(tidyverse)
+
+# -----------------------------
+# Extract L. vannamei samples
+# -----------------------------
+
+van_meta <- meta %>%
+  filter(Species == "L.vannamei" | Species == "L. vannamei")
+
+van_samples <- intersect(van_meta$Sample_ID, colnames(df_data))
+
+van_df <- df_data[, van_samples, drop = FALSE]
+
+# Remove metabolites with no data
+van_df <- van_df[rowSums(!is.na(van_df)) > 0, ]
+
+# Replace remaining NAs with metabolite mean
+van_df <- t(apply(van_df, 1, function(x) {
+  x[is.na(x)] <- mean(x, na.rm = TRUE)
+  x
+}))
+
+# -----------------------------
+# PCA
+# -----------------------------
+# PCA requires samples in rows
+van_pca_input <- t(van_df)
+
+# Remove columns (metabolites) with zero variance
+van_pca_input <- van_pca_input[, apply(van_pca_input, 2, sd, na.rm = TRUE) > 0]
+
+# Run PCA
+pca_res <- prcomp(
+  van_pca_input,
+  center = TRUE,
+  scale. = TRUE
+)
+
+
+
+# Variance explained
+var_exp <- (pca_res$sdev^2) / sum(pca_res$sdev^2) * 100
+
+# Scores
+scores <- as.data.frame(pca_res$x)
+
+scores$Sample_ID <- rownames(scores)
+
+scores <- scores %>%
+  left_join(van_meta, by = "Sample_ID")
+
+# -----------------------------
+# Plot
+# -----------------------------
+ggplot(scores, aes(x = PC1, y = PC2)) +
+  geom_point(
+    size = 4.5,
+    colour = "#1B9E77",
+    alpha = 0.8
+  ) +
+  stat_ellipse(
+    level = 0.95,
+    colour = "#1B9E77",
+    linewidth = 1
+  ) +
+  labs(
+    title = expression("PCA of Metabolites in "*italic("L. vannamei")),
+    x = paste0("PC1 (", round(var_exp[1], 1), "%)"),
+    y = paste0("PC2 (", round(var_exp[2], 1), "%)")
+  ) +
+  theme_minimal(base_size = 14)
+
+
+
+
+
 
