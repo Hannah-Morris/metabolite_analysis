@@ -855,3 +855,193 @@ ggplot(scores, aes(x = PC1, y = PC2)) +
 
 
 
+
+
+
+
+
+
+
+library(tidyverse)
+library(pheatmap)
+
+# -----------------------------
+# Extract L. vannamei samples
+# -----------------------------
+
+van_meta <- meta %>%
+  filter(Species == "L.vannamei" | Species == "L. vannamei")
+
+van_samples <- intersect(van_meta$Sample_ID, colnames(df_data))
+
+van_df <- df_data[, van_samples, drop = FALSE]
+
+# -----------------------------
+# Calculate mean abundance
+# -----------------------------
+
+van_abundance <- rowMeans(van_df, na.rm = TRUE)
+
+abund_df <- data.frame(
+  Metabolite = rownames(van_df),
+  MeanAbundance = van_abundance
+) %>%
+  arrange(desc(MeanAbundance))
+
+# -----------------------------
+# Select top 30 metabolites
+# -----------------------------
+
+top30_mets <- abund_df %>%
+  filter(Metabolite != "Methanol") %>%
+  slice_head(n = 30) %>%
+  pull(Metabolite)
+
+heatmap_data <- van_df[top30_mets, ]
+
+# -----------------------------
+# Remove rows with all NA
+# -----------------------------
+
+heatmap_data <- heatmap_data[
+  rowSums(!is.na(heatmap_data)) > 0,
+]
+
+# -----------------------------
+# Replace NAs with row means
+# -----------------------------
+
+heatmap_data <- t(apply(heatmap_data, 1, function(x) {
+  
+  if(all(is.na(x))) return(rep(0, length(x)))
+  
+  x[is.na(x)] <- mean(x, na.rm = TRUE)
+  
+  return(x)
+  
+}))
+
+heatmap_data <- as.matrix(heatmap_data)
+
+# -----------------------------
+# Remove zero variance rows
+# -----------------------------
+
+heatmap_data <- heatmap_data[
+  apply(heatmap_data, 1, function(x) sd(x, na.rm = TRUE) > 0),
+]
+
+
+
+# -----------------------------
+# Plot heatmap
+# -----------------------------
+
+pheatmap(
+  heatmap_data,
+  scale = "row",
+  cluster_rows = FALSE,
+  cluster_cols = FALSE,
+  clustering_method = "complete",
+  show_colnames = FALSE,
+  show_rownames = TRUE,
+  fontsize_row = 8,
+  border_color = NA,
+  main = expression(italic("L. vannamei") ~ "Top 30 Most Abundant Metabolites")
+)
+
+
+
+
+
+# -----------------------------
+# Top 20 most variable metabolites
+# -----------------------------
+
+# Calculate SD for each metabolite
+van_sd <- apply(van_df, 1, sd, na.rm = TRUE)
+
+var_df <- data.frame(
+  Metabolite = rownames(van_df),
+  SD = van_sd,
+  row.names = NULL
+) %>%
+  filter(Metabolite != "Methanol") %>%
+  arrange(desc(SD))
+
+# View top metabolites
+head(var_df, 20)
+
+# Select top 20
+top20_var <- var_df %>%
+  slice_head(n = 20)
+
+# Plot
+ggplot(top20_var,
+       aes(x = reorder(Metabolite, SD),
+           y = SD)) +
+  geom_col(fill = "#7570B3") +
+  coord_flip() +
+  labs(
+    title = expression(
+      "Top 20 Most Variable Metabolites in " *
+        italic("L. vannamei")
+    ),
+    x = "Metabolite",
+    y = "Standard Deviation"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.grid.minor = element_blank()
+  )
+
+# -----------------------------
+# Calculate CV for each metabolite
+# -----------------------------
+
+van_mean <- rowMeans(van_df, na.rm = TRUE)
+van_sd <- apply(van_df, 1, sd, na.rm = TRUE)
+
+cv_df <- data.frame(
+  Metabolite = rownames(van_df),
+  Mean = van_mean,
+  SD = van_sd
+) %>%
+  mutate(CV = SD / Mean) %>%
+  filter(
+    Metabolite != "Methanol",
+    Mean > quantile(van_mean, 0.25, na.rm = TRUE)
+  ) %>%
+  arrange(desc(CV))
+
+# View top metabolites
+head(cv_df, 20)
+
+# Top 20 CV metabolites
+top20_cv <- cv_df %>%
+  slice_head(n = 20)
+
+# -----------------------------
+# Plot
+# -----------------------------
+
+ggplot(top20_cv,
+       aes(x = reorder(Metabolite, CV),
+           y = CV)) +
+  geom_col(fill = "#1B9E77", width = 0.8) +
+  coord_flip() +
+  labs(
+    title = expression(
+      "Top 20 Most Variable Metabolites in " *
+        italic("L. vannamei")
+    ),
+    x = NULL,
+    y = "Coefficient of Variation (CV)"
+  ) +
+  theme_minimal(base_size = 16) +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+
+
